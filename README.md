@@ -1,7 +1,6 @@
 # TreeAI CLI
 
-TreeAI CLI 是基于 Node.js/TypeScript 的终端工具，可快速编排 Claude、Codex 等 AI 助手的多任务 Git worktree 工作流。它复刻并优化了 Python 版 ManyAI CLI 的体验，重点增强 `start` 和 `finish` 命令，实现「一步选择」的交互模式。
-
+TreeAI CLI 是基于 Node.js/TypeScript 的终端工具，可快速编排 Claude、Codex 等 AI 助手的多任务 Git worktree 工作流。
 ## 快速开始
 
 ```bash
