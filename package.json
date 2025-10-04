@@ -1,0 +1,33 @@
+{
+  "name": "treeai",
+  "version": "0.1.0",
+  "description": "TreeAI CLI - Git worktree automation for Claude & Codex multi-task workflows",
+  "type": "module",
+  "bin": {
+    "treeai": "dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc --project tsconfig.json"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^5.2.0",
+    "chalk": "^5.6.2",
+    "commander": "^12.1.0",
+    "debug": "^4.4.3",
+    "fs-extra": "^11.3.2",
+    "nanoid": "^5.1.6",
+    "simple-git": "^3.28.0"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.12",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^22.18.8",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@9.12.3"
+}
