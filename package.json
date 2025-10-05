@@ -6,6 +6,21 @@
   "bin": {
     "treeai": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "git",
+    "worktree",
+    "cli",
+    "ai",
+    "claude",
+    "codex",
+    "workflow",
+    "productivity"
+  ],
+  "author": "leecj",
+  "license": "MIT",
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsc --project tsconfig.json"
