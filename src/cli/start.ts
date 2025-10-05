@@ -63,12 +63,18 @@ export const registerStartCommand = (program: Command): void => {
       const nonInteractive = options.nonInteractive || options.yes;
       const config = await loadConfig();
 
-      let repoPath: string | undefined = options.repo ? path.resolve(options.repo) : config.defaultRepo;
+      let repoPath: string | undefined;
 
-      if (!repoPath) {
+      if (options.repo) {
+        repoPath = path.resolve(options.repo);
+      } else {
+        // 优先检测当前目录
         const detected = await getRepo(process.cwd()).catch(() => null);
         if (detected) {
           repoPath = detected.repoPath;
+        } else {
+          // fallback到配置中的默认仓库
+          repoPath = config.defaultRepo;
         }
       }
 

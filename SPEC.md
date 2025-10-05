@@ -1,7 +1,6 @@
 # TreeAI CLI 规格说明
 
 ## 1. 项目背景
-- **参考项目**：基于现有 `manyai_cli`（Python）项目的功能与流程，但重写为 Node.js/TypeScript 终端应用。
 - **重命名**：新项目命名为 `treeai`，旨在凸显「分支/工作树」管理能力与树状结构管理的联想。
 - **目标用户**：在终端中频繁创建 Git worktree 并配合 Claude、Codex 等 AI IDE 工具开展多任务协作的开发者。
 

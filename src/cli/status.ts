@@ -31,11 +31,18 @@ export const registerStatusCommand = (program: Command): void => {
         }
       }
 
-      let repoPath = options.repo ? path.resolve(options.repo) : config.defaultRepo;
-      if (!repoPath) {
+      let repoPath: string | undefined;
+
+      if (options.repo) {
+        repoPath = path.resolve(options.repo);
+      } else {
+        // 优先检测当前目录
         const detected = await resolveMainRepoPath(process.cwd());
         if (detected) {
           repoPath = detected;
+        } else {
+          // fallback到配置中的默认仓库
+          repoPath = config.defaultRepo;
         }
       }
 
