@@ -69,6 +69,22 @@ pnpm build
 
 - Shows default repository, AI tool configuration, recent task list, and worktree status.
 
+## Supported AI Tools
+
+TreeAI CLI comes with pre-configured support for multiple AI coding assistants:
+
+- **Claude Code** - Anthropic's official CLI
+- **Codex** - Using gpt-5-codex model with reasoning
+- **Happy** - [Happy Coder](https://github.com/slopus/happy) - An agentic AI pair programmer
+- **Happy Codex** - Happy with gpt-5-codex configuration
+
+You can specify which tool to use with the `--tool` flag:
+
+```bash
+treeai start feature/login --tool happy
+treeai switch --tool happy_codex
+```
+
 ## Configuration
 
 - Stored at `~/.config/treeai/config.json`.

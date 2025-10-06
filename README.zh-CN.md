@@ -69,6 +69,22 @@ pnpm build
 
 - 查看默认仓库、AI 工具配置、最近任务列表与当前工作树状态。
 
+## 支持的 AI 工具
+
+TreeAI CLI 内置了多个 AI 编程助手的预配置支持：
+
+- **Claude Code** - Anthropic 官方 CLI
+- **Codex** - 使用 gpt-5-codex 模型，支持推理
+- **Happy** - [Happy Coder](https://github.com/slopus/happy) - 智能 AI 结对编程助手
+- **Happy Codex** - Happy 配合 gpt-5-codex 的配置
+
+可以通过 `--tool` 参数指定使用的工具：
+
+```bash
+treeai start feature/login --tool happy
+treeai switch --tool happy_codex
+```
+
 ## 配置说明
 
 - 配置文件位于 `~/.config/treeai/config.json`。
