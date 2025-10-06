@@ -1,6 +1,6 @@
 {
   "name": "treeai",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "TreeAI CLI - Git worktree automation for Claude & Codex multi-task workflows",
   "type": "module",
   "bin": {

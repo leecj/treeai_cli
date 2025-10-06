@@ -21,6 +21,7 @@ npx treeai start bugfix/session-timeout
 ```
 
 - `start`：检测当前仓库，创建/切换分支与工作树，并按配置启动 AI 工具。
+- `switch`：切换到已存在的工作树，并启动 AI 工具继续工作。
 - `finish`：回到基础分支、清理工作树目录，并按提示删除或保留已合并分支。
 - 任意命令都可加 `--help` 查看可用选项，例如 `treeai start --help`。
 
@@ -39,6 +40,7 @@ pnpm build
 ## 核心命令
 
 ### `treeai start [任务名]`
+
 - 自动解析 Git 仓库（可通过 `--repo` 指定）。
 - 智能生成分支名与工作树目录（默认 `~/.treeai/<repo>/<task>`）。
 - 支持自定义基础分支 `--base` 与工作树目录 `--worktree`。
@@ -47,7 +49,16 @@ pnpm build
 - 任务名称直接用于分支命名（支持中文等字符），便于识别。
 - 可使用 `--skip-launch`、`--tool`、`--tool-arg` 控制 AI 工具启动行为。
 
+### `treeai switch`
+
+- 列出当前仓库下所有已存在的工作树，交互式选择要切换的工作树。
+- 自动在选定的工作树目录中启动 AI 工具（默认 `claude`）。
+- 支持 `--repo` 指定仓库，`--tool` 指定工具，`--tool-arg` 传递额外参数。
+- 可使用 `--skip-launch` 仅显示工作树路径而不启动工具。
+- 适用于在多个任务之间快速切换，无需重新创建工作树。
+
 ### `treeai finish [任务名]`
+
 - 自动检测当前工作树，或从历史列表中选择目标任务。
 - 默认执行三步组合：切回基础分支、删除工作树目录、删除已合并分支。
 - 通过多选列表可调整清理动作；`--keep-branch` / `--no-cleanup` 控制默认选项。
@@ -55,14 +66,17 @@ pnpm build
 - 输出会说明各个选项对应的 Git 操作，方便快速确认。
 
 ### `treeai status`
+
 - 查看默认仓库、AI 工具配置、最近任务列表与当前工作树状态。
 
 ## 配置说明
+
 - 配置文件位于 `~/.config/treeai/config.json`。
 - 支持默认仓库、最近仓库列表、AI 工具预设、权限模式与历史任务记录。
 - `start` / `finish` 会自动更新配置；后续将提供显式的 `treeai config` 子命令。
 
 ## 下一步计划
+
 - 丰富 `worktrees` 和 `branches` 子命令，补齐 ManyAI CLI 的完整功能面。
 - 提供配置迁移与命令别名，辅助从 Python 版本切换。
 - 引入单元测试与集成测试（基于 Vitest + execa）。

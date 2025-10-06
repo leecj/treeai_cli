@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { registerStartCommand } from './start.js';
 import { registerFinishCommand } from './finish.js';
 import { registerStatusCommand } from './status.js';
+import { registerSwitchCommand } from './switch.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json');
@@ -16,6 +17,7 @@ export const createCLI = (): Command => {
     .version(pkg.version ?? '0.0.0');
 
   registerStartCommand(program);
+  registerSwitchCommand(program);
   registerFinishCommand(program);
   registerStatusCommand(program);
 

@@ -21,6 +21,7 @@ npx treeai start bugfix/session-timeout
 ```
 
 - `start`: detects the current repository, creates/switches the branch and worktree, then launches the configured AI tool.
+- `switch`: switches to an existing worktree and launches the AI tool to continue working.
 - `finish`: returns to the base branch, cleans up the worktree directory, and offers to delete the merged branch.
 - Append `--help` to any command (for example `treeai start --help`) to inspect available flags.
 
@@ -39,6 +40,7 @@ pnpm build
 ## Core Commands
 
 ### `treeai start [taskName]`
+
 - Automatically resolves the Git repository (override via `--repo`).
 - Generates branch and worktree names, defaulting to `~/.treeai/<repo>/<task>`.
 - Supports custom base branch `--base` and worktree directory `--worktree`.
@@ -47,7 +49,16 @@ pnpm build
 - Uses the task name directly as the branch name (Unicode-friendly) for easy recognition.
 - Use `--skip-launch`, `--tool`, or `--tool-arg` to control AI launch behavior.
 
+### `treeai switch`
+
+- Lists all existing worktrees in the current repository for interactive selection.
+- Automatically launches the AI tool in the selected worktree directory (default `claude`).
+- Supports `--repo` to specify repository, `--tool` to specify tool, and `--tool-arg` for extra parameters.
+- Use `--skip-launch` to only display the worktree path without launching the tool.
+- Perfect for quickly switching between multiple ongoing tasks without recreating worktrees.
+
 ### `treeai finish [taskName]`
+
 - Detects the current worktree or lets you choose from history.
 - By default performs: checkout base branch, delete worktree directory, delete merged branch.
 - Multi-select prompts let you adjust cleanup actions; `--keep-branch` and `--no-cleanup` tweak defaults.
@@ -55,14 +66,17 @@ pnpm build
 - Summaries explain the underlying Git operations so you know exactly what happens.
 
 ### `treeai status`
+
 - Shows default repository, AI tool configuration, recent task list, and worktree status.
 
 ## Configuration
+
 - Stored at `~/.config/treeai/config.json`.
 - Supports default repository, recent repositories, AI tool presets, permission mode, and task history.
 - `start` / `finish` keep the configuration in sync; a dedicated `treeai config` subcommand is planned.
 
 ## Roadmap
+
 - Expand the `worktrees` and `branches` subcommands to reach feature parity with the original Python CLI.
 - Provide migration helpers and command aliases for teams moving from the Python version.
 - Add unit and integration tests (Vitest + execa).
