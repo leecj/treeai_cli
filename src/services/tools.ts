@@ -19,16 +19,6 @@ const PERMISSION_MODE_ARGS: Record<PermissionMode, string[]> = {
   strict: ['--strict-permissions']
 };
 
-const dedupeArgs = (args: string[]): string[] => {
-  const result: string[] = [];
-  for (const arg of args) {
-    if (!result.includes(arg)) {
-      result.push(arg);
-    }
-  }
-  return result;
-};
-
 export const buildToolCommand = (
   config: TreeAIConfig,
   options: LaunchToolOptions
@@ -45,21 +35,28 @@ export const buildToolCommand = (
   }
 
   const args: string[] = [];
+
+  // 使用工具预设的参数（完全控制）
   args.push(...(preset.args ?? []));
 
+  // 只有用户明确指定 permissionMode 时才添加权限参数
   if (options.permissionMode) {
-    args.push(...(PERMISSION_MODE_ARGS[options.permissionMode] ?? []));
-  } else {
-    args.push(...(PERMISSION_MODE_ARGS[config.defaultPermissionMode] ?? []));
+    const permissionArgs = PERMISSION_MODE_ARGS[options.permissionMode] ?? [];
+    for (const permArg of permissionArgs) {
+      if (!args.includes(permArg)) {
+        args.push(permArg);
+      }
+    }
   }
 
+  // 添加用户额外指定的参数
   if (options.extraArgs?.length) {
     args.push(...options.extraArgs);
   }
 
   return {
     executable: preset.executable,
-    args: dedupeArgs(args)
+    args
   };
 };
 

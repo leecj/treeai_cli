@@ -1,6 +1,6 @@
 {
   "name": "treeai",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "TreeAI CLI - Git worktree automation for Claude & Codex multi-task workflows",
   "type": "module",
   "bin": {
@@ -23,7 +23,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc --project tsconfig.json"
+    "build": "tsc --project tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "release": "npm run build && npm publish"
   },
   "dependencies": {
     "@inquirer/prompts": "^5.2.0",

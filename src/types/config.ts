@@ -40,12 +40,35 @@ export const DEFAULT_CONFIG: TreeAIConfig = {
       args: ['--dangerously-skip-permissions']
     },
     codex: {
-      executable: 'codexh',
-      args: []
+      executable: 'codex',
+      args: [
+        '-m',
+        'gpt-5-codex',
+        '-c',
+        'model_reasoning_effort=high',
+        '-c',
+        'model_reasoning_summary_format=experimental',
+        '--search',
+        '--dangerously-bypass-approvals-and-sandbox'
+      ]
     },
     happy: {
       executable: 'happy',
-      args: []
+      args: ['--dangerously-skip-permissions']
+    },
+    happy_codex: {
+      executable: 'happy',
+      args: [
+        'codex',
+        '-m',
+        'gpt-5-codex',
+        '-c',
+        'model_reasoning_effort=high',
+        '-c',
+        'model_reasoning_summary_format=experimental',
+        '--search',
+        '--dangerously-bypass-approvals-and-sandbox'
+      ]
     }
   },
   history: {
