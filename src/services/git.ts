@@ -63,6 +63,19 @@ export const branchExists = async (git: SimpleGit, branchName: string): Promise<
   return branches.all.includes(branchName);
 };
 
+export const isBranchMergedInto = async (
+  git: SimpleGit,
+  branchName: string,
+  baseBranch: string
+): Promise<boolean> => {
+  try {
+    await git.raw(['merge-base', '--is-ancestor', branchName, baseBranch]);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
 export const detectDefaultBaseBranch = async (git: SimpleGit): Promise<string> => {
   const branches = await git.branchLocal();
   const priorities = ['main', 'master', 'develop', 'dev'];
@@ -97,6 +110,14 @@ export const createWorktree = async (
   args.push(!exists && baseBranch ? baseBranch : branchName);
 
   await git.raw(args);
+};
+
+export const mergeBranchIntoCurrent = async (git: SimpleGit, branchName: string): Promise<void> => {
+  await git.merge([branchName]);
+};
+
+export const abortMerge = async (git: SimpleGit): Promise<void> => {
+  await git.raw(['merge', '--abort']);
 };
 
 export const removeWorktree = async (git: SimpleGit, worktreePath: string, force = false): Promise<void> => {

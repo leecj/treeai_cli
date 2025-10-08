@@ -4,9 +4,13 @@ import {
   deleteBranch,
   detectDefaultBaseBranch,
   getRepo,
+  getCurrentBranch,
+  isBranchMergedInto,
   isWorktreeClean,
   listWorktrees,
+  mergeBranchIntoCurrent,
   removeWorktree,
+  abortMerge,
   resolveMainRepoPath,
   resolveRepoRoot
 } from '../services/git.js';
@@ -178,50 +182,141 @@ export const registerFinishCommand = (program: Command): void => {
             ]
           );
 
-      const actions = new Set(selections);
+      const actions = new Set<FinishAction>(selections);
+      const performedActions = new Set<FinishAction>();
+
+      const originalBranch = await getCurrentBranch(repoPath!);
+      let currentBranch = originalBranch;
 
       if (actions.has('checkoutBase')) {
         try {
           await git.checkout(baseBranch);
+          currentBranch = baseBranch;
+          performedActions.add('checkoutBase');
           logger.success('已切换主工作树到 %s', baseBranch);
         } catch (error) {
           logger.warn('切换到 %s 失败：%s', baseBranch, (error as Error).message);
+          currentBranch = await getCurrentBranch(repoPath!);
         }
       }
 
-      if (actions.has('removeWorktree')) {
-        logger.info('正在删除工作树 %s ...', target.path);
-        await removeWorktree(git, target.path, options.force);
-        logger.success('工作树已删除。');
+      const needsCleanup = actions.has('removeWorktree') || actions.has('deleteBranch');
+      let allowCleanup = true;
+
+      if (needsCleanup && target.branch) {
+        let mergedIntoBase = await isBranchMergedInto(git, target.branch, baseBranch);
+
+        if (!mergedIntoBase) {
+          if (allowCleanup) {
+            const baseClean = await isWorktreeClean(repoPath!);
+            if (!baseClean && !options.force) {
+              allowCleanup = false;
+              logger.error('基础工作树 %s 存在未提交更改，请先提交或使用 --force。', repoPath!);
+            } else if (!baseClean) {
+              logger.warn('基础工作树 %s 存在未提交更改，在 --force 模式下继续。', repoPath!);
+            }
+          }
+
+          if (allowCleanup) {
+            let switchedTemporarily = false;
+            try {
+              if (currentBranch !== baseBranch) {
+                await git.checkout(baseBranch);
+                currentBranch = baseBranch;
+                if (actions.has('checkoutBase')) {
+                  performedActions.add('checkoutBase');
+                } else {
+                  switchedTemporarily = true;
+                  logger.info('为保证合并，暂时切换到 %s。', baseBranch);
+                }
+              }
+
+              await mergeBranchIntoCurrent(git, target.branch);
+              mergedIntoBase = true;
+              logger.success('已将 %s 合并到 %s。', target.branch, baseBranch);
+            } catch (error) {
+              allowCleanup = false;
+              logger.error('合并 %s -> %s 失败：%s', target.branch, baseBranch, (error as Error).message);
+              try {
+                await abortMerge(git);
+              } catch (abortError) {
+                logger.warn('尝试回滚未完成的合并失败：%s', (abortError as Error).message);
+              }
+            } finally {
+              if (switchedTemporarily) {
+                try {
+                  if (originalBranch && originalBranch !== baseBranch) {
+                    await git.checkout(originalBranch);
+                    currentBranch = originalBranch;
+                    logger.info('合并完成后已恢复到原始分支 %s。', originalBranch);
+                  }
+                } catch (restoreError) {
+                  logger.warn('恢复到原始分支失败：%s', (restoreError as Error).message);
+                }
+              }
+            }
+          }
+        }
+
+        if (!mergedIntoBase && allowCleanup) {
+          if (options.force) {
+            logger.warn('分支 %s 尚未合并到 %s，已在 --force 模式下继续清理。', target.branch, baseBranch);
+          } else {
+            allowCleanup = false;
+            logger.warn('分支 %s 尚未合并到 %s，已取消清理操作。', target.branch, baseBranch);
+          }
+        }
+      }
+
+      if (allowCleanup) {
+        if (actions.has('removeWorktree')) {
+          logger.info('正在删除工作树 %s ...', target.path);
+          await removeWorktree(git, target.path, options.force);
+          performedActions.add('removeWorktree');
+          logger.success('工作树已删除。');
+        } else {
+          logger.info('已选择保留工作树：%s', target.path);
+        }
+
+        if (actions.has('deleteBranch') && target.branch) {
+          try {
+            logger.info('正在删除分支 %s ...', target.branch);
+            await deleteBranch(git, target.branch, options.force);
+            performedActions.add('deleteBranch');
+            logger.success('分支 %s 已删除。', target.branch);
+          } catch (error) {
+            logger.warn('删除分支失败：%s', (error as Error).message);
+          }
+        } else if (target.branch) {
+          logger.info('保留分支 %s。', target.branch);
+        }
       } else {
-        logger.info('已选择保留工作树：%s', target.path);
-      }
-
-      if (actions.has('deleteBranch') && target.branch) {
-        try {
-          logger.info('正在删除分支 %s ...', target.branch);
-          await deleteBranch(git, target.branch, options.force);
-          logger.success('分支 %s 已删除。', target.branch);
-        } catch (error) {
-          logger.warn('删除分支失败：%s', (error as Error).message);
+        if (actions.has('removeWorktree')) {
+          logger.warn('已跳过删除工作树 %s，待成功合并后再执行。', target.path);
+        } else {
+          logger.info('已选择保留工作树：%s', target.path);
         }
-      } else if (target.branch) {
-        logger.info('保留分支 %s。', target.branch);
+
+        if (actions.has('deleteBranch') && target.branch) {
+          logger.warn('已跳过删除分支 %s，待成功合并后再执行。', target.branch);
+        } else if (target.branch) {
+          logger.info('保留分支 %s。', target.branch);
+        }
       }
 
       const updatedRecent = updateRecentRepos(
         {
           ...config,
-          defaultRepo: repoPath
+          defaultRepo: repoPath!
         },
-        repoPath
+        repoPath!
       );
 
       const updatedConfig = {
         ...updatedRecent,
         history: {
           tasks: updatedRecent.history.tasks.map((task) =>
-            task.repo === repoPath && task.branch === target.branch
+            task.repo === repoPath! && task.branch === target.branch
               ? {
                   ...task,
                   worktreePath: target.path,
@@ -234,19 +329,39 @@ export const registerFinishCommand = (program: Command): void => {
 
       await saveConfig(updatedConfig);
 
-      logger.success('完成：%s', target.branch);
-      const summaryPieces: string[] = [];
-      if (actions.has('checkoutBase')) {
-        summaryPieces.push(`切换到 ${baseBranch}`);
+      const executedSteps: string[] = [];
+      if (performedActions.has('checkoutBase')) {
+        executedSteps.push(`切换到 ${baseBranch}`);
       }
-      if (actions.has('removeWorktree')) {
-        summaryPieces.push('清理工作树目录');
+      if (performedActions.has('removeWorktree')) {
+        executedSteps.push('清理工作树目录');
       }
-      if (actions.has('deleteBranch')) {
-        summaryPieces.push('删除本地分支');
+      if (performedActions.has('deleteBranch')) {
+        executedSteps.push('删除本地分支');
       }
-      if (summaryPieces.length) {
-        logger.info('执行步骤：%s', summaryPieces.join(' -> '));
+      if (executedSteps.length) {
+        logger.info('执行步骤：%s', executedSteps.join(' -> '));
+      }
+
+      const skippedSteps: string[] = [];
+      if (actions.has('checkoutBase') && !performedActions.has('checkoutBase')) {
+        skippedSteps.push(`切换到 ${baseBranch}`);
+      }
+      if (actions.has('removeWorktree') && !performedActions.has('removeWorktree')) {
+        skippedSteps.push('清理工作树目录');
+      }
+      if (actions.has('deleteBranch') && !performedActions.has('deleteBranch')) {
+        skippedSteps.push('删除本地分支');
+      }
+      if (skippedSteps.length) {
+        logger.warn('未执行步骤：%s', skippedSteps.join('、'));
+      }
+
+      const allCompleted = Array.from(actions).every((action) => performedActions.has(action));
+      if (allCompleted) {
+        logger.success('完成：%s', target.branch);
+      } else {
+        logger.warn('完成：%s（部分步骤未执行，请处理后重试）', target.branch);
       }
       logger.info('如需重新开始，可执行：treeai start %s', target.branch);
     });
