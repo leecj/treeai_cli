@@ -109,13 +109,15 @@ export const registerSwitchCommand = (program: Command): void => {
       logger.info('分支名称：%s', selectedWorktree.branch ?? 'detached');
 
       if (!options.skipLaunch) {
-        await launchTool(config, {
+        const launched = await launchTool(config, {
           toolName: options.tool,
           permissionMode: options.permissionMode,
           extraArgs: options.toolArg,
           workingDirectory: selectedWorktree.path
         });
-        logger.info('已在 %s 中启动 AI 工具，结束后 Ctrl+C 返回即可。', selectedWorktree.path);
+        if (launched) {
+          logger.info('已在 %s 中启动 AI 工具，结束后 Ctrl+C 返回即可。', selectedWorktree.path);
+        }
       } else {
         logger.info('已跳过 AI 工具启动。');
         logger.info('可以执行：cd %s', selectedWorktree.path);

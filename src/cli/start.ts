@@ -26,6 +26,49 @@ import {
 import { launchTool } from '../services/tools.js';
 import type { PermissionMode } from '../types/index.js';
 
+interface NpmArgvMeta {
+  cooked?: string[];
+  remain?: string[];
+}
+
+const parseNpmArgv = (): NpmArgvMeta | null => {
+  const raw = process.env.npm_config_argv;
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as NpmArgvMeta;
+  } catch {
+    return null;
+  }
+};
+
+const getNpmConfigValue = (name: string): string | undefined => {
+  const envKey = `npm_config_${name.replace(/-/g, '_')}`;
+  return process.env[envKey];
+};
+
+const parseBooleanLike = (value: string | undefined): boolean | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === '' || normalized === 'true' || normalized === '1') {
+    return true;
+  }
+  if (normalized === 'false' || normalized === '0') {
+    return false;
+  }
+  return true;
+};
+
+const didRequestFlag = (meta: NpmArgvMeta | null, flag: string): boolean => {
+  if (!meta?.cooked) {
+    return false;
+  }
+  return meta.cooked.some((arg) => arg === flag || arg.startsWith(`${flag}=`));
+};
+
 interface StartOptions {
   repo?: string;
   base?: string;
@@ -36,6 +79,8 @@ interface StartOptions {
   yes?: boolean;
   nonInteractive?: boolean;
   skipLaunch?: boolean;
+  reuseCurrent?: boolean;
+  noReuseCurrent?: boolean;
 }
 
 const collectToolArgs = (value: string, previous: string[] = []): string[] => {
@@ -47,7 +92,7 @@ const collectToolArgs = (value: string, previous: string[] = []): string[] => {
 
 export const registerStartCommand = (program: Command): void => {
   program
-    .command('start')
+    .command('start', { isDefault: true })
     .argument('[taskName]', '任务名称，将用于生成分支与工作树名')
     .description('创建工作树并启动默认 AI 工具')
     .option('--repo <path>', '指定 Git 仓库路径')
@@ -59,9 +104,88 @@ export const registerStartCommand = (program: Command): void => {
     .option('--yes', '跳过所有确认提示', false)
     .option('--non-interactive', '非交互模式，缺失信息时报错', false)
     .option('--skip-launch', '创建后不启动 AI 工具', false)
+    .option('--reuse-current', '直接在当前目录启动 AI 工具，不创建工作树')
+    .option('--no-reuse-current', '禁用自动复用当前目录，强制进入创建流程')
     .action(async (taskName: string | undefined, options: StartOptions) => {
-      const nonInteractive = options.nonInteractive || options.yes;
       const config = await loadConfig();
+
+      if (options.reuseCurrent && options.noReuseCurrent) {
+        throw new Error('不能同时指定 --reuse-current 与 --no-reuse-current。');
+      }
+
+      const npmArgv = parseNpmArgv();
+      const valuesConsumedFromNpm = new Set<string>();
+
+      const applyNpmStringOption = (flag: string, key: string, assign: (value: string) => void) => {
+        if (!didRequestFlag(npmArgv, flag)) {
+          return;
+        }
+        const value = getNpmConfigValue(key);
+        if (!value) {
+          return;
+        }
+        assign(value);
+        if (npmArgv?.remain?.includes(value)) {
+          valuesConsumedFromNpm.add(value);
+        }
+      };
+
+      const applyNpmBooleanOption = (flag: string, key: string, assign: (value: boolean) => void) => {
+        if (!didRequestFlag(npmArgv, flag)) {
+          return;
+        }
+        const parsed = parseBooleanLike(getNpmConfigValue(key));
+        if (parsed === undefined) {
+          assign(true);
+        } else {
+          assign(parsed);
+        }
+      };
+
+      applyNpmStringOption('--repo', 'repo', (value) => {
+        options.repo = value;
+      });
+      applyNpmStringOption('--base', 'base', (value) => {
+        options.base = value;
+      });
+      applyNpmStringOption('--worktree', 'worktree', (value) => {
+        options.worktreePath = value;
+      });
+      applyNpmStringOption('--tool', 'tool', (value) => {
+        options.tool = value;
+      });
+      applyNpmStringOption('--tool-arg', 'tool_arg', (value) => {
+        options.toolArg = [...(options.toolArg ?? []), value];
+      });
+      applyNpmStringOption('--permission-mode', 'permission_mode', (value) => {
+        options.permissionMode = value as PermissionMode;
+      });
+
+      applyNpmBooleanOption('--skip-launch', 'skip_launch', (value) => {
+        options.skipLaunch = value;
+      });
+      applyNpmBooleanOption('--non-interactive', 'non_interactive', (value) => {
+        options.nonInteractive = value;
+      });
+      applyNpmBooleanOption('--yes', 'yes', (value) => {
+        options.yes = value;
+      });
+      applyNpmBooleanOption('--reuse-current', 'reuse_current', (value) => {
+        options.reuseCurrent = value;
+      });
+      if (didRequestFlag(npmArgv, '--no-reuse-current')) {
+        const parsed = parseBooleanLike(getNpmConfigValue('no_reuse_current'));
+        const resolved = parsed === undefined ? true : parsed;
+        options.noReuseCurrent = resolved;
+        if (resolved) {
+          options.reuseCurrent = false;
+        }
+      }
+      if (options.reuseCurrent === false && !options.noReuseCurrent) {
+        options.noReuseCurrent = true;
+      }
+
+      const nonInteractive = options.nonInteractive || options.yes;
 
       let repoPath: string | undefined;
 
@@ -79,6 +203,9 @@ export const registerStartCommand = (program: Command): void => {
       }
 
       if (!repoPath) {
+        if (options.reuseCurrent) {
+          throw new Error('无法确定 Git 仓库路径，请使用 --repo 指定。');
+        }
         if (nonInteractive) {
           throw new Error('无法确定 Git 仓库路径，请使用 --repo 指定。');
         }
@@ -96,6 +223,70 @@ export const registerStartCommand = (program: Command): void => {
       repoPath = resolvedRepo;
       const branches = await git.branchLocal();
 
+      if (taskName && valuesConsumedFromNpm.has(taskName)) {
+        taskName = undefined;
+      }
+
+      const shouldImplicitlyReuse =
+        !options.noReuseCurrent &&
+        options.reuseCurrent !== true &&
+        !nonInteractive &&
+        !taskName &&
+        !options.base &&
+        !options.worktreePath;
+
+      const shouldReuseCurrent = options.reuseCurrent === true || shouldImplicitlyReuse;
+
+      if (shouldReuseCurrent) {
+        if (options.base) {
+          throw new Error('--reuse-current 模式不支持指定 --base。');
+        }
+        if (taskName) {
+          logger.warn('已忽略任务名 %s，因为当前模式不会创建新分支。', taskName);
+        }
+
+        let workingDirectory: string;
+        if (options.worktreePath) {
+          const resolvedWorkingDirectory = path.resolve(options.worktreePath);
+          if (!(await pathExists(resolvedWorkingDirectory))) {
+            throw new Error(`指定的目录不存在：${resolvedWorkingDirectory}`);
+          }
+          workingDirectory = resolvedWorkingDirectory;
+        } else if (options.repo) {
+          workingDirectory = repoPath;
+        } else {
+          workingDirectory = process.cwd();
+        }
+
+        logger.info('将在目录 %s 启动 AI 工具（不创建工作树）。', workingDirectory);
+
+        const updatedConfig = updateRecentRepos(
+          {
+            ...config,
+            defaultRepo: repoPath
+          },
+          repoPath
+        );
+
+        await saveConfig(updatedConfig);
+
+        if (!options.skipLaunch) {
+          const launched = await launchTool(updatedConfig, {
+            toolName: options.tool,
+            permissionMode: options.permissionMode,
+            extraArgs: options.toolArg,
+            workingDirectory
+          });
+          if (launched) {
+            logger.info('AI 工具已启动，结束后按 Ctrl+C 返回即可。');
+          }
+        } else {
+          logger.info('已跳过 AI 工具启动，目录：%s', workingDirectory);
+        }
+
+        return;
+      }
+
       const defaultBase = options.base ?? (await detectDefaultBaseBranch(git));
       const baseBranch = options.base
         ? options.base
@@ -104,6 +295,10 @@ export const registerStartCommand = (program: Command): void => {
           : await promptForBaseBranch(branches.all, defaultBase);
 
       let providedTask = taskName;
+
+      if (providedTask && valuesConsumedFromNpm.has(providedTask)) {
+        providedTask = undefined;
+      }
 
       if (!providedTask && !nonInteractive) {
         const historyChoice = await promptTaskFromHistory(
@@ -134,12 +329,15 @@ export const registerStartCommand = (program: Command): void => {
         }
         logger.info('工作树目录：%s', existingWorktree.path);
         if (!options.skipLaunch) {
-          await launchTool(config, {
+          const launched = await launchTool(config, {
             toolName: options.tool,
             permissionMode: options.permissionMode,
             extraArgs: options.toolArg,
             workingDirectory: existingWorktree.path
           });
+          if (launched) {
+            logger.info('AI 工具已启动，结束后按 Ctrl+C 返回即可。');
+          }
         } else {
           logger.info('已跳过 AI 工具启动，工作树路径：%s', existingWorktree.path);
         }
@@ -188,13 +386,15 @@ export const registerStartCommand = (program: Command): void => {
       await saveConfig(updatedConfig);
 
       if (!options.skipLaunch) {
-        await launchTool(updatedConfig, {
+        const launched = await launchTool(updatedConfig, {
           toolName: options.tool,
           permissionMode: options.permissionMode,
           extraArgs: options.toolArg,
           workingDirectory: worktreePath
         });
-        logger.info('已在 %s 中启动 AI 工具，结束后 Ctrl+C 返回即可。', worktreePath);
+        if (launched) {
+          logger.info('已在 %s 中启动 AI 工具，结束后 Ctrl+C 返回即可。', worktreePath);
+        }
       } else {
         logger.info('已跳过 AI 工具启动。');
         logger.info('可以执行：cd %s', worktreePath);

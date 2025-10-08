@@ -37,10 +37,14 @@ pnpm dev -- start feature/login
 pnpm build
 ```
 
+- `npm run dev --tool codex` 等价于 `npm run dev -- --tool codex`，可直接在当前目录使用指定 AI 工具（运行时 npm 可能提示警告，可忽略）。
+
 ## 核心命令
 
 ### `treeai start [任务名]`
 
+- 直接执行 `treeai` 等同于 `treeai start`，默认在当前目录快速启动 AI 工具（不创建工作树）。
+- 通过 `--no-reuse-current` 可禁用自动复用逻辑，进入工作树创建流程。
 - 自动解析 Git 仓库（可通过 `--repo` 指定）。
 - 智能生成分支名与工作树目录（默认 `~/.treeai/<repo>/<task>`）。
 - 支持自定义基础分支 `--base` 与工作树目录 `--worktree`。
@@ -48,6 +52,7 @@ pnpm build
 - 创建完成后会按配置启动默认的 AI 工具（默认 `claude`，带 `--dangerously-skip-permissions`）。
 - 任务名称直接用于分支命名（支持中文等字符），便于识别。
 - 可使用 `--skip-launch`、`--tool`、`--tool-arg` 控制 AI 工具启动行为。
+- 使用 `--reuse-current` 可显式复用当前目录（若已禁用自动复用）。
 
 ### `treeai switch`
 

@@ -94,7 +94,7 @@
       "executable": "claude",
       "args": ["--dangerously-skip-permissions"]
     },
-    "codex": {"executable": "codexh", "args": []}
+    "codex": {"executable": "codex", "args": []}
   },
   "history": {
     "tasks": [

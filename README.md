@@ -37,10 +37,14 @@ pnpm dev -- start feature/login
 pnpm build
 ```
 
+- `npm run dev --tool codex` now works as a shorthand for `npm run dev -- --tool codex` (npm may emit a warning about `--tool`; it can be ignored).
+
 ## Core Commands
 
 ### `treeai start [taskName]`
 
+- Running `treeai` with no subcommand is equivalent to `treeai start` and will, by default, launch the AI tool in the current directory (no worktree).
+- Use `--no-reuse-current` to disable the quick-open behavior and walk through the worktree creation flow.
 - Automatically resolves the Git repository (override via `--repo`).
 - Generates branch and worktree names, defaulting to `~/.treeai/<repo>/<task>`.
 - Supports custom base branch `--base` and worktree directory `--worktree`.
@@ -48,6 +52,7 @@ pnpm build
 - Launches the configured AI tool by default (default `claude` with `--dangerously-skip-permissions`).
 - Uses the task name directly as the branch name (Unicode-friendly) for easy recognition.
 - Use `--skip-launch`, `--tool`, or `--tool-arg` to control AI launch behavior.
+- Use `--reuse-current` to explicitly reuse the current directory when the quick-open mode has been disabled.
 
 ### `treeai switch`
 
