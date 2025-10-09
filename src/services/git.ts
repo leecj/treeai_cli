@@ -69,8 +69,11 @@ export const isBranchMergedInto = async (
   baseBranch: string
 ): Promise<boolean> => {
   try {
-    await git.raw(['merge-base', '--is-ancestor', branchName, baseBranch]);
-    return true;
+    const [mergeBase, branchTip] = await Promise.all([
+      git.raw(['merge-base', branchName, baseBranch]),
+      git.revparse([branchName])
+    ]);
+    return mergeBase.trim() === branchTip.trim();
   } catch (error) {
     return false;
   }

@@ -200,16 +200,18 @@ export const registerFinishCommand = (program: Command): void => {
         }
       }
 
-      const needsCleanup = actions.has('removeWorktree') || actions.has('deleteBranch');
+      const cleanupActionsSelected = actions.has('removeWorktree') || actions.has('deleteBranch');
+      const ensureMergeSelected = cleanupActionsSelected || actions.has('checkoutBase');
       let allowCleanup = true;
+      let canAttemptMerge = true;
+      let mergedIntoBase = ensureMergeSelected ? await isBranchMergedInto(git, target.branch, baseBranch) : true;
 
-      if (needsCleanup && target.branch) {
-        let mergedIntoBase = await isBranchMergedInto(git, target.branch, baseBranch);
-
+      if (ensureMergeSelected) {
         if (!mergedIntoBase) {
-          if (allowCleanup) {
+          if (canAttemptMerge) {
             const baseClean = await isWorktreeClean(repoPath!);
             if (!baseClean && !options.force) {
+              canAttemptMerge = false;
               allowCleanup = false;
               logger.error('基础工作树 %s 存在未提交更改，请先提交或使用 --force。', repoPath!);
             } else if (!baseClean) {
@@ -217,7 +219,7 @@ export const registerFinishCommand = (program: Command): void => {
             }
           }
 
-          if (allowCleanup) {
+          if (canAttemptMerge) {
             let switchedTemporarily = false;
             try {
               if (currentBranch !== baseBranch) {
@@ -235,6 +237,7 @@ export const registerFinishCommand = (program: Command): void => {
               mergedIntoBase = true;
               logger.success('已将 %s 合并到 %s。', target.branch, baseBranch);
             } catch (error) {
+              canAttemptMerge = false;
               allowCleanup = false;
               logger.error('合并 %s -> %s 失败：%s', target.branch, baseBranch, (error as Error).message);
               try {
@@ -258,12 +261,18 @@ export const registerFinishCommand = (program: Command): void => {
           }
         }
 
-        if (!mergedIntoBase && allowCleanup) {
-          if (options.force) {
-            logger.warn('分支 %s 尚未合并到 %s，已在 --force 模式下继续清理。', target.branch, baseBranch);
+        if (!mergedIntoBase) {
+          if (cleanupActionsSelected) {
+            if (options.force) {
+              logger.warn('分支 %s 尚未合并到 %s，已在 --force 模式下继续清理。', target.branch, baseBranch);
+            } else {
+              allowCleanup = false;
+              logger.warn('分支 %s 尚未合并到 %s，已取消清理操作。', target.branch, baseBranch);
+            }
+          } else if (options.force) {
+            logger.warn('分支 %s 尚未合并到 %s，请尽快手动处理。', target.branch, baseBranch);
           } else {
-            allowCleanup = false;
-            logger.warn('分支 %s 尚未合并到 %s，已取消清理操作。', target.branch, baseBranch);
+            logger.warn('分支 %s 尚未合并到 %s，请手动合并后重试。', target.branch, baseBranch);
           }
         }
       }
