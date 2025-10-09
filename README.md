@@ -102,5 +102,3 @@ treeai switch --tool happy_codex
 - Provide migration helpers and command aliases for teams moving from the Python version.
 - Add unit and integration tests (Vitest + execa).
 - Ship both the npm package and a standalone executable bundle.
-
-Temp demo change Thu Oct  9 15:40:28 CST 2025
