@@ -5,6 +5,7 @@ import {
   detectDefaultBaseBranch,
   getRepo,
   getCurrentBranch,
+  countUniqueCommits,
   isBranchMergedInto,
   isWorktreeClean,
   listWorktrees,
@@ -130,6 +131,13 @@ export const registerFinishCommand = (program: Command): void => {
         throw new Error('无法识别目标工作树的分支名称。');
       }
 
+      if (target.branch === baseBranch) {
+        const baseMessage = options.base
+          ? `--base ${baseBranch} 与待清理分支 ${target.branch} 相同，请指定不同的基础分支。`
+          : `检测到基础分支 ${baseBranch} 与待清理分支 ${target.branch} 相同，请使用 --base 指定正确的基础分支。`;
+        throw new Error(baseMessage);
+      }
+
       const clean = await isWorktreeClean(target.path);
       if (!clean && !options.force) {
         if (nonInteractive) {
@@ -205,6 +213,23 @@ export const registerFinishCommand = (program: Command): void => {
       let allowCleanup = true;
       let canAttemptMerge = true;
       let mergedIntoBase = ensureMergeSelected ? await isBranchMergedInto(git, target.branch, baseBranch) : true;
+      let uniqueCommitCount: number | null = ensureMergeSelected
+        ? await countUniqueCommits(git, target.branch, baseBranch)
+        : 0;
+
+      const hasOutstandingCommits = (): boolean => {
+        if (!ensureMergeSelected) {
+          return false;
+        }
+        if (uniqueCommitCount === null) {
+          return true;
+        }
+        return uniqueCommitCount > 0;
+      };
+
+      if (hasOutstandingCommits()) {
+        mergedIntoBase = false;
+      }
 
       if (ensureMergeSelected) {
         if (!mergedIntoBase) {
@@ -234,7 +259,12 @@ export const registerFinishCommand = (program: Command): void => {
               }
 
               await mergeBranchIntoCurrent(git, target.branch);
-              mergedIntoBase = true;
+              uniqueCommitCount = await countUniqueCommits(git, target.branch, baseBranch);
+              if (uniqueCommitCount === null) {
+                mergedIntoBase = await isBranchMergedInto(git, target.branch, baseBranch);
+              } else {
+                mergedIntoBase = uniqueCommitCount === 0;
+              }
               logger.success('已将 %s 合并到 %s。', target.branch, baseBranch);
             } catch (error) {
               canAttemptMerge = false;
@@ -264,15 +294,51 @@ export const registerFinishCommand = (program: Command): void => {
         if (!mergedIntoBase) {
           if (cleanupActionsSelected) {
             if (options.force) {
-              logger.warn('分支 %s 尚未合并到 %s，已在 --force 模式下继续清理。', target.branch, baseBranch);
+              if (uniqueCommitCount && uniqueCommitCount > 0) {
+                logger.warn(
+                  '分支 %s 尚未完全合并到 %s（剩余 %d 个提交），已在 --force 模式下继续清理。',
+                  target.branch,
+                  baseBranch,
+                  uniqueCommitCount
+                );
+              } else {
+                logger.warn('分支 %s 尚未合并到 %s，已在 --force 模式下继续清理。', target.branch, baseBranch);
+              }
             } else {
               allowCleanup = false;
-              logger.warn('分支 %s 尚未合并到 %s，已取消清理操作。', target.branch, baseBranch);
+              if (uniqueCommitCount && uniqueCommitCount > 0) {
+                logger.warn(
+                  '分支 %s 尚未完全合并到 %s（剩余 %d 个提交），已取消清理操作。',
+                  target.branch,
+                  baseBranch,
+                  uniqueCommitCount
+                );
+              } else {
+                logger.warn('分支 %s 尚未合并到 %s，已取消清理操作。', target.branch, baseBranch);
+              }
             }
           } else if (options.force) {
-            logger.warn('分支 %s 尚未合并到 %s，请尽快手动处理。', target.branch, baseBranch);
+            if (uniqueCommitCount && uniqueCommitCount > 0) {
+              logger.warn(
+                '分支 %s 尚未完全合并到 %s（剩余 %d 个提交），请尽快手动处理。',
+                target.branch,
+                baseBranch,
+                uniqueCommitCount
+              );
+            } else {
+              logger.warn('分支 %s 尚未合并到 %s，请尽快手动处理。', target.branch, baseBranch);
+            }
           } else {
-            logger.warn('分支 %s 尚未合并到 %s，请手动合并后重试。', target.branch, baseBranch);
+            if (uniqueCommitCount && uniqueCommitCount > 0) {
+              logger.warn(
+                '分支 %s 尚未完全合并到 %s（剩余 %d 个提交），请手动合并后重试。',
+                target.branch,
+                baseBranch,
+                uniqueCommitCount
+              );
+            } else {
+              logger.warn('分支 %s 尚未合并到 %s，请手动合并后重试。', target.branch, baseBranch);
+            }
           }
         }
       }

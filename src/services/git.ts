@@ -79,6 +79,20 @@ export const isBranchMergedInto = async (
   }
 };
 
+export const countUniqueCommits = async (
+  git: SimpleGit,
+  branchName: string,
+  baseBranch: string
+): Promise<number | null> => {
+  try {
+    const output = await git.raw(['rev-list', '--left-only', '--count', `${branchName}...${baseBranch}`]);
+    const parsed = Number.parseInt(output.trim(), 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  } catch (error) {
+    return null;
+  }
+};
+
 export const detectDefaultBaseBranch = async (git: SimpleGit): Promise<string> => {
   const branches = await git.branchLocal();
   const priorities = ['main', 'master', 'develop', 'dev'];
