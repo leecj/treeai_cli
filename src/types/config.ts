@@ -69,6 +69,10 @@ export const DEFAULT_CONFIG: TreeAIConfig = {
         '--search',
         '--dangerously-bypass-approvals-and-sandbox'
       ]
+    },
+    cursor: {
+      executable: 'cursor',
+      args: ['.']
     }
   },
   history: {
