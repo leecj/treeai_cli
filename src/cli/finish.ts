@@ -159,7 +159,7 @@ export const registerFinishCommand = (program: Command): void => {
       if (!options.keepBranch && target.branch) {
         defaultSelections.add('deleteBranch');
       }
-      defaultSelections.add('checkoutBase');
+      // 不再默认选择 checkoutBase，只有用户明确需要时才选择
 
       if (!nonInteractive) {
         logger.info('可选操作说明：');
