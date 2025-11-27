@@ -209,7 +209,8 @@ export const registerFinishCommand = (program: Command): void => {
       }
 
       const cleanupActionsSelected = actions.has('removeWorktree') || actions.has('deleteBranch');
-      const ensureMergeSelected = cleanupActionsSelected || actions.has('checkoutBase');
+      // 只有选择 checkoutBase 时才需要合并到主干
+      const ensureMergeSelected = actions.has('checkoutBase');
       let allowCleanup = true;
       let canAttemptMerge = true;
       let mergedIntoBase = ensureMergeSelected ? await isBranchMergedInto(git, target.branch, baseBranch) : true;
@@ -227,7 +228,8 @@ export const registerFinishCommand = (program: Command): void => {
         return uniqueCommitCount > 0;
       };
 
-      if (hasOutstandingCommits()) {
+      // 只有在选择合并操作时才检查是否有未合并的提交
+      if (ensureMergeSelected && hasOutstandingCommits()) {
         mergedIntoBase = false;
       }
 
@@ -268,7 +270,10 @@ export const registerFinishCommand = (program: Command): void => {
               logger.success('已将 %s 合并到 %s。', target.branch, baseBranch);
             } catch (error) {
               canAttemptMerge = false;
-              allowCleanup = false;
+              // 在 --force 模式下仍然允许清理操作
+              if (!options.force) {
+                allowCleanup = false;
+              }
               logger.error('合并 %s -> %s 失败：%s', target.branch, baseBranch, (error as Error).message);
               try {
                 await abortMerge(git);
@@ -291,20 +296,10 @@ export const registerFinishCommand = (program: Command): void => {
           }
         }
 
-        if (!mergedIntoBase) {
+        // 只有在选择了合并操作但合并失败时才阻止清理
+        if (!mergedIntoBase && ensureMergeSelected) {
           if (cleanupActionsSelected) {
-            if (options.force) {
-              if (uniqueCommitCount && uniqueCommitCount > 0) {
-                logger.warn(
-                  '分支 %s 尚未完全合并到 %s（剩余 %d 个提交），已在 --force 模式下继续清理。',
-                  target.branch,
-                  baseBranch,
-                  uniqueCommitCount
-                );
-              } else {
-                logger.warn('分支 %s 尚未合并到 %s，已在 --force 模式下继续清理。', target.branch, baseBranch);
-              }
-            } else {
+            if (!options.force) {
               allowCleanup = false;
               if (uniqueCommitCount && uniqueCommitCount > 0) {
                 logger.warn(
@@ -316,29 +311,30 @@ export const registerFinishCommand = (program: Command): void => {
               } else {
                 logger.warn('分支 %s 尚未合并到 %s，已取消清理操作。', target.branch, baseBranch);
               }
-            }
-          } else if (options.force) {
-            if (uniqueCommitCount && uniqueCommitCount > 0) {
-              logger.warn(
-                '分支 %s 尚未完全合并到 %s（剩余 %d 个提交），请尽快手动处理。',
-                target.branch,
-                baseBranch,
-                uniqueCommitCount
-              );
             } else {
-              logger.warn('分支 %s 尚未合并到 %s，请尽快手动处理。', target.branch, baseBranch);
+              if (uniqueCommitCount && uniqueCommitCount > 0) {
+                logger.warn(
+                  '分支 %s 尚未完全合并到 %s（剩余 %d 个提交），已在 --force 模式下继续清理。',
+                  target.branch,
+                  baseBranch,
+                  uniqueCommitCount
+                );
+              } else {
+                logger.warn('分支 %s 尚未合并到 %s，已在 --force 模式下继续清理。', target.branch, baseBranch);
+              }
             }
+          }
+        } else if (!mergedIntoBase && !ensureMergeSelected && cleanupActionsSelected) {
+          // 如果没有选择合并操作，只提醒但仍允许清理
+          if (uniqueCommitCount && uniqueCommitCount > 0) {
+            logger.warn(
+              '分支 %s 尚未完全合并到 %s（剩余 %d 个提交），选择跳过合并直接清理。',
+              target.branch,
+              baseBranch,
+              uniqueCommitCount
+            );
           } else {
-            if (uniqueCommitCount && uniqueCommitCount > 0) {
-              logger.warn(
-                '分支 %s 尚未完全合并到 %s（剩余 %d 个提交），请手动合并后重试。',
-                target.branch,
-                baseBranch,
-                uniqueCommitCount
-              );
-            } else {
-              logger.warn('分支 %s 尚未合并到 %s，请手动合并后重试。', target.branch, baseBranch);
-            }
+            logger.warn('分支 %s 尚未合并到 %s，选择跳过合并直接清理。', target.branch, baseBranch);
           }
         }
       }
