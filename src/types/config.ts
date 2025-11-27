@@ -16,6 +16,7 @@ export interface HistoryTask {
   repo: string;
   worktreePath: string;
   lastUsed: string;
+  baseBranch?: string; // 新增：基线分支，用于合并目标
 }
 
 export interface TreeAIConfig {

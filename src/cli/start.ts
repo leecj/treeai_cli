@@ -379,7 +379,8 @@ export const registerStartCommand = (program: Command): void => {
           name: normalizedTask,
           branch: branchName,
           repo: repoPath,
-          worktreePath
+          worktreePath,
+          baseBranch // 记录基线分支
         }
       );
 

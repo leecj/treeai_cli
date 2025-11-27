@@ -79,8 +79,6 @@ export const registerFinishCommand = (program: Command): void => {
 
       const { git, repoPath: resolvedRepo } = await getRepo(repoPath);
       repoPath = resolvedRepo;
-
-      const baseBranch = options.base ?? (await detectDefaultBaseBranch(git));
       const worktrees = (await listWorktrees(git)).filter((wt) => path.resolve(wt.path) !== path.resolve(repoPath!));
 
       if (!worktrees.length) {
@@ -129,6 +127,20 @@ export const registerFinishCommand = (program: Command): void => {
 
       if (!target.branch) {
         throw new Error('无法识别目标工作树的分支名称。');
+      }
+
+      // 优先从任务历史获取基线分支
+      const taskHistory = config.history.tasks.find(
+        task => task.repo === repoPath && task.branch === target.branch
+      );
+      const taskBaseBranch = taskHistory?.baseBranch;
+      const baseBranch = options.base ?? taskBaseBranch ?? (await detectDefaultBaseBranch(git));
+
+      // 记录使用的基线分支信息
+      if (taskBaseBranch && !options.base) {
+        logger.info('从任务历史获取基线分支：%s', taskBaseBranch);
+      } else if (!options.base) {
+        logger.info('使用默认基线分支：%s', baseBranch);
       }
 
       if (target.branch === baseBranch) {
