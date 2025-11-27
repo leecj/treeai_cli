@@ -209,8 +209,8 @@ export const registerFinishCommand = (program: Command): void => {
       }
 
       const cleanupActionsSelected = actions.has('removeWorktree') || actions.has('deleteBranch');
-      // 只有选择 checkoutBase 时才需要合并到主干
-      const ensureMergeSelected = actions.has('checkoutBase');
+      // 只有单独选择 checkoutBase 时才需要合并到主干
+      const ensureMergeSelected = actions.has('checkoutBase') && !cleanupActionsSelected;
       let allowCleanup = true;
       let canAttemptMerge = true;
       let mergedIntoBase = ensureMergeSelected ? await isBranchMergedInto(git, target.branch, baseBranch) : true;
